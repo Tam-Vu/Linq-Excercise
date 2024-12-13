@@ -339,21 +339,320 @@ Hocviens
 		HoTen = x.hv.Ho + " " + x.hv.Ten
 	}
 ). Distinct();
-//AI
+
+//16 Tìm họ tên giáo viên dạy môn CTRR cho ít nhất hai lớp trong cùng một học kỳ của một năm học
+Giaoviens
+    .Where(gv => 
+		Giangdays.Any(gd => 
+			gv.Magv == gd.Magv && 
+			gd.Mamh == "CTRR" &&
+			Giangdays
+			.Any(gd1 =>
+				gd1.Magv == gd.Magv &&
+				gd1.Mamh == "CTRR" &&
+				gd1.Malop != gd.Malop &&
+				gd1.Hocky == gd.Hocky &&
+				gd1.Nam == gd.Nam
+			)
+		)
+	)
+	.Select(x =>
+		new {
+			MaGV = x.Magv,
+			TenGV = x.Hoten
+		}
+	);
+//17 Danh sách học viên và điểm thi môn CSDL (chỉ lấy điểm của lần thi sau cùng)
 Hocviens
-.Join(Ketquathis,
-    hv => hv.Mahv,
-    kqt => kqt.Mahv,
-    (hv, kqt) => new { hv, kqt })
-.Where(x => x.hv.Malop == "K11" &&
-            ((x.kqt.Lanthi == 2 && x.kqt.Diem == 5) ||
-            Ketquathis.Where(kqt2 => kqt2.Kqua != "Dat")
-                .GroupBy(kqt2 => new { kqt2.Mahv, kqt2.Mamh })
-                .Where(g => g.Count() > 3)
-                .Select(g => g.Key.Mahv)
-                .Contains(x.hv.Mahv)))
-.Select(x => new
-{
-    HoTen = x.hv.Ho + " " + x.hv.Ten
+.Join(
+	Ketquathis,
+	hv => hv.Mahv,
+	kqt => kqt.Mahv,
+	(hv, kqt) => new {hv, kqt}
+)
+.Where(x =>
+	x.kqt.Mamh == "CSDL" &&
+	x.kqt.Lanthi == 
+	Ketquathis
+	.Where(y => 
+		y.Mahv == x.hv.Mahv &&
+		y.Mamh == "CSDL")
+	.Max(m => m.Lanthi)	
+	)
+.Select(x =>
+	new {
+		MaHV = x.hv.Mahv,
+		TenHV = x.hv.Ho + " " + x.hv.Ten,
+		Mamh = x.kqt.Mamh,
+		Diem = x.kqt.Diem
+	}
+);
+//18 Danh sách học viên và điểm thi môn “Co So Du Lieu” (chỉ lấy điểm cao nhất của các lần thi)
+Hocviens
+.Join(
+	Ketquathis,
+	hv => hv.Mahv,
+	kqt => kqt.Mahv,
+	(hv, kqt) => new {hv, kqt}
+)
+.Join(
+	Monhocs,
+	x => x.kqt.Mamh,
+	mh => mh.Mamh,
+	(x, mh) => new {x.hv, x.kqt, mh}
+)
+.Where(x =>
+	x.mh.Tenmh == "Co So Du Lieu" &&
+	x.kqt.Lanthi == 
+	Ketquathis
+	.Join(
+		Monhocs,
+		kqt => kqt.Mamh,
+		mh => mh.Mamh,
+		(kqt, mh) => new {kqt, mh}
+	)
+	.Where(y => 
+		y.kqt.Mahv == x.hv.Mahv &&
+		y.mh.Tenmh == "Co So Du Lieu")
+	.Max(m => m.kqt.Lanthi)	
+	)
+.Select(x =>
+	new {
+		MaHV = x.hv.Mahv,
+		TenHV = x.hv.Ho + " " + x.hv.Ten,
+		Mamh = x.kqt.Mamh,
+		Tenmh = x.mh.Tenmh,
+		Diem = x.kqt.Diem
+	}
+);
+//19 Khoa nào (mã khoa, tên khoa) được thành lập sớm nhất
+Khoas
+.Where(x =>
+	x.Ngtlap == Khoas.Min(x => x.Ngtlap)
+)
+.Select(x => 
+	new {
+		MaKhoa = x.Makhoa,
+		TenKhoa = x.Tenkhoa
+	}
+)
+//20 Có bao nhiêu giáo viên có học hàm là “GS” hoặc “PGS”
+Giaoviens
+.Where(x => 
+	x.Hocham == "GS" ||
+	x.Hocham == "PGS"
+)
+.Count()
+//21 Thống kê có bao nhiêu giáo viên có học vị là “CN”, “KS”, “Ths”, “TS”, “PTS” trong mỗi khoa
+Giaoviens
+    .GroupBy(gv => new { gv.Makhoa, gv.Hocvi })
+    .Select(group => new 
+    {
+        MaKhoa = group.Key.Makhoa,
+        HocVi = group.Key.Hocvi,
+        SoGiaoVien = group.Count()
+    })
+    .OrderBy(x => x.MaKhoa)
+    .ToList();
+//22 Mỗi môn học thống kê số lượng học viên theo kết quả (đạt và không đạt)
+Monhocs
+.Join(
+	Ketquathis,
+	mh => mh.Mamh,
+	kqt => kqt.Mamh,
+	(mh, kqt) => new {mh, kqt}
+)
+.GroupBy(gr =>
+	new {
+		gr.mh.Mamh,
+		gr.mh.Tenmh,
+		gr.kqt.Kqua
+	}
+)
+.OrderBy(or => or.Key.Mamh)
+.Select(sl =>
+	new {
+		MaMH = sl.Key.Mamh,
+		TenMH = sl.Key.Tenmh,
+		Kqua = sl.Key.Kqua,
+		Count = sl.Count()
+	}
+);
+//23 Tìm giáo viên (mã giáo viên, họ tên) là giáo viên chủ nhiệm của một lớp, đồng thời dạy cho lớp đó ít nhất một môn học.
+Giaoviens
+.Where(gv =>
+	Giangdays
+	.Any(gd => 
+		gd.Magv == gv.Magv &&
+		Lops.Any(l =>
+			l.Magvcn == gv.Magv &&
+			l.Malop == gd.Malop
+		)
+	)
+)
+.Select(sl =>
+	new 
+	{
+		MaGV = sl.Magv,
+		TenGV = sl.Hoten,
+	}
+)
+.AsEnumerable()
+.DistinctBy(dt => dt.MaGV);
+//24 Tìm họ tên lớp trưởng của lớp có sỉ số cao nhất
+Hocviens
+.Where(hv => 
+	Lops
+	.Any(l =>
+		l.Trglop == hv.Mahv &&
+		l.Siso == 
+		Lops.Max(m => m.Siso)
+	)
+)
+.Select(sl => 
+	new {
+		MaHV = sl.Mahv,
+		HoTen = sl.Ho + " " + sl.Ten 
+	}
+)
+//25 Tìm họ tên những LOPTRG thi không đạt quá 3 môn (mỗi môn đều thi không đạt ở tất cả các lần thi)
+Hocviens
+.Where(hv =>
+	Lops.Any(l =>
+		l.Trglop == hv.Mahv
+	)
+	&&
+	Ketquathis.Where(kqt => 
+		kqt.Mahv == hv.Mahv &&
+		kqt.Kqua != "Dat" 
+	)
+	.GroupBy(gr => new {
+		gr.Mahv,
+		gr.Mamh
+	})
+	.Any(w =>
+		w.Count() > 3
+	)
+)
+.Select(sl => 
+	new {
+		MaHV = sl.Mahv,
+		HoTen = sl.Ho + " " + sl.Ten 
+	}
+)
+//26 Tìm học viên (mã học viên, họ tên) có số môn đạt điểm 9,10 nhiều nhất
+Hocviens
+.Join(
+	Ketquathis,
+	hv => hv.Mahv,
+	kqt => kqt.Mahv,
+	(hv, kqt) => new {hv, kqt}
+)
+.AsEnumerable()
+.GroupBy(gr =>
+	new {
+		gr.hv.Mahv, gr.hv.Ho, gr.hv.Ten
+	}
+)
+.Where(hv =>
+	hv.Count() == 
+	Ketquathis
+	.Where(kqt => 
+		kqt.Diem >= 9
+	)
+	.GroupBy(kqt => kqt.Mahv)
+	.AsEnumerable()
+    .Max(g => g.Count())
+)
+.Select(g => new {
+    MaHV = g.Key.Mahv,
+    HoTen = g.Key.Ho + " " + g.Key.Ten
 })
-.Distinct();
+//28 Trong từng học kỳ của từng năm, mỗi giáo viên phân công dạy bao nhiêu môn học, bao nhiêu lớp.
+//CÂU NÀY CHƯA XONG
+Giangdays
+.Join(
+	Giaoviens,
+	gd => gd.Magv,
+	gv => gv.Magv,
+	(gd, gv) => new {gd, gv}
+)
+.GroupBy(gr =>
+	new {
+		gr.gd.Nam,
+		gr.gd.Hocky,
+		gr.gv.Magv,
+		gr.gv.Hoten,
+		gr.gd.Mamh,
+	}
+).
+Select(sl =>
+	new {
+		NamHoc = sl.Key.Nam,
+		HocKy = sl.Key.Hocky,
+		MaGV = sl.Key.Magv,
+		TenGV = sl.Key.Hoten,
+		SoLop = sl.Count()
+	}
+);
+//30 Tìm môn học (mã môn học, tên môn học) có nhiều học viên thi không đạt (ở lần thi thứ 1) nhất.
+Monhocs
+.GroupJoin(
+    Ketquathis,
+    mh => mh.Mamh,
+    kqt => kqt.Mamh,
+    (mh, kqts) => new {
+        MonHoc = mh,
+        FailedTests = kqts.Where(kqt => kqt.Lanthi == 1 && kqt.Kqua == "Khong Dat")
+    }
+)
+.AsEnumerable()
+.Where(gr => gr.FailedTests.Count() == 
+Ketquathis
+.Where(kqt => kqt.Lanthi == 1 && kqt.Kqua == "Khong Dat")
+.GroupBy(kqt => kqt.Mamh)
+.AsEnumerable()
+.Max(g => g.Count())
+)
+.AsEnumerable()
+.Select(gr => new {
+    MaMH = gr.MonHoc.Mamh,
+    TenMH = gr.MonHoc.Tenmh
+})
+.ToList();
+//31 Tìm học viên (mã học viên, họ tên) thi môn nào cũng đạt (chỉ xét lần thi thứ 1)
+Hocviens
+.Where(hv =>
+	!Ketquathis.Any(kqt =>
+		kqt.Mahv == hv.Mahv &&
+		kqt.Kqua == "Khong Dat" && 
+		kqt.Lanthi == 1
+	)
+)
+.Select(sl => 
+	new 
+	{
+		MaHV = sl.Mahv,
+		TenHV = sl.Ho + " " + sl.Ten
+	}
+)
+.AsEnumerable() 
+.DistinctBy(dt => dt.MaHV);
+//33 Tìm học viên (mã học viên, họ tên) đã thi tất cả các môn đều đạt (chỉ xét lần thi thứ 1)
+Hocviens
+    .Where(hv => !Monhocs
+        .Any(mh => !Ketquathis
+            .Any(kqt =>
+                kqt.MaMH == mh.MaMH &&
+                kqt.MaHV == hv.Mahv &&
+                kqt.Lanthi == 1 &&
+                kqt.Kqua == "Dat"
+            )
+        )
+    )
+    .Select(hv => new {
+        MaHV = hv.Mahv,
+        HoTen = hv.Ho + " " + hv.Ten
+    })
+    .ToList();
+

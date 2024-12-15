@@ -640,19 +640,20 @@ Hocviens
 .DistinctBy(dt => dt.MaHV);
 //33 Tìm học viên (mã học viên, họ tên) đã thi tất cả các môn đều đạt (chỉ xét lần thi thứ 1)
 Hocviens
-    .Where(hv => !Monhocs
-        .Any(mh => !Ketquathis
-            .Any(kqt =>
-                kqt.MaMH == mh.MaMH &&
-                kqt.MaHV == hv.Mahv &&
-                kqt.Lanthi == 1 &&
-                kqt.Kqua == "Dat"
-            )
+.Where(hv => !Monhocs
+    .Any(mh => !Ketquathis
+        .Any(kqt =>
+            kqt.Mamh == mh.Mamh &&
+            kqt.Mamh == hv.Mahv &&
+            kqt.Lanthi == 1 &&
+            kqt.Kqua == "Dat"
         )
     )
-    .Select(hv => new {
-        MaHV = hv.Mahv,
-        HoTen = hv.Ho + " " + hv.Ten
-    })
-    .ToList();
+)
+.Select(hv => new {
+    MaHV = hv.Mahv,
+    HoTen = hv.Ho + " " + hv.Ten
+})
+.ToList();
 
+//Test commit
